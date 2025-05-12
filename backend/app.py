@@ -5,6 +5,10 @@ import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 
+
+print(">>> Flask app started execution")
+
+
 app = Flask(__name__)
 CORS(app)
 
