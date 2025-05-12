@@ -3,7 +3,7 @@ from flask_cors import CORS
 import pandas as pd
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
-# Removed SentenceTransformer from global scope
+from sentence_transformers import SentenceTransformer
 
 print(">>> Flask app started execution")
 
@@ -17,25 +17,22 @@ movies_df['genres'] = movies_df['genres'].fillna('')
 movies_df['vote_average'] = pd.to_numeric(movies_df['vote_average'], errors='coerce').fillna(0)
 movies_df['vote_count'] = pd.to_numeric(movies_df['vote_count'], errors='coerce').fillna(0)
 
-# Keep model variable globally uninitialized
-model = None
+# Load model
+model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 
-def build_text_embedding(row, model):
+# Build embeddings with genre context
+def build_text_embedding(row):
     text = f"{row['overview']} Genres: {row['genres']}"
     return model.encode(text)
 
+movies_df['embedding'] = movies_df.apply(build_text_embedding, axis=1)
+
+@app.route("/")
+def index():
+    return "EasyFilm Backend is running"
+
 @app.route("/recommend", methods=["POST"])
 def recommend():
-    global model
-    if model is None:
-        from sentence_transformers import SentenceTransformer
-        print(">>> Loading SentenceTransformer model...")
-        model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
-        print(">>> Model loaded")
-
-        # Build embeddings (delayed until model is loaded)
-        movies_df['embedding'] = movies_df.apply(lambda row: build_text_embedding(row, model), axis=1)
-
     try:
         data = request.get_json()
         favorite_ids = data.get("favorite_ids", [])
@@ -79,6 +76,7 @@ def recommend():
             candidate_embeddings = np.stack(candidate_movies['embedding'].values)
             similarities = cosine_similarity(movie_embedding, candidate_embeddings)[0]
 
+            # Combine similarity + quality
             candidate_movies['score'] = similarities * (candidate_movies['vote_average'] / 10)
 
             top_movies = candidate_movies.sort_values(by='score', ascending=False).head(10)
@@ -108,6 +106,7 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     print(f">>> Flask app running on port {port}")
     app.run(host="0.0.0.0", port=port)
+
 
 
 
