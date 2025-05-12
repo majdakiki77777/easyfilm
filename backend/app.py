@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
+import os
 
 print(">>> Flask app started execution")
 
@@ -20,16 +21,17 @@ movies_df['vote_count'] = pd.to_numeric(movies_df['vote_count'], errors='coerce'
 # Load model
 model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
 
-# Build embeddings with genre context
+# Build embeddings
 def build_text_embedding(row):
     text = f"{row['overview']} Genres: {row['genres']}"
     return model.encode(text)
 
+print(">>> Generating embeddings for movies...")
 movies_df['embedding'] = movies_df.apply(build_text_embedding, axis=1)
 
 @app.route("/")
 def index():
-    return "EasyFilm Backend is running"
+    return " EasyFilm Backend is live!"
 
 @app.route("/recommend", methods=["POST"])
 def recommend():
@@ -75,8 +77,6 @@ def recommend():
 
             candidate_embeddings = np.stack(candidate_movies['embedding'].values)
             similarities = cosine_similarity(movie_embedding, candidate_embeddings)[0]
-
-            # Combine similarity + quality
             candidate_movies['score'] = similarities * (candidate_movies['vote_average'] / 10)
 
             top_movies = candidate_movies.sort_values(by='score', ascending=False).head(10)
@@ -102,8 +102,7 @@ def recommend():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    import os
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 10000))
     print(f">>> Flask app running on port {port}")
     app.run(host="0.0.0.0", port=port)
 
